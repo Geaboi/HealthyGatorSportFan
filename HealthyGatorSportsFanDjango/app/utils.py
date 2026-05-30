@@ -54,7 +54,7 @@ def check_game_status(apiInstance):
         return "No game found", "", 0, "", 0, ''
     if curr_game.status == 'scheduled':
         return 'Game not started', curr_game.home_team.name, 0, curr_game.away_team.name, 0, ''
-    if curr_game.home_team == curr_team:
+    if curr_game.home_team.name == curr_team:
         florida_score = curr_game.home_team.points
         opponent_score = curr_game.away_team.points
     else:

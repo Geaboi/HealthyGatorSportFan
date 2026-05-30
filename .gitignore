@@ -15,6 +15,7 @@ build/
 # Ignore Python bytecode files
 *.pyc
 __pycache__/
+.venv/
 
 # Ignore environment variables
 .env
