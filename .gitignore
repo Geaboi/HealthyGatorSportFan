@@ -23,6 +23,9 @@ __pycache__/
 # Ignore staticfiles directory
 /staticfiles
 
+#Ignore celerybeat-schedule
+celerybeat-schedule
+
 # Ignore auto generated celery files
 HealthyGatorSportsFanDjango/celerybeat-schedule.bak
 HealthyGatorSportsFanDjango/celerybeat-schedule.dat

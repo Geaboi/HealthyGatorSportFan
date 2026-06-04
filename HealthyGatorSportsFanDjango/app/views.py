@@ -8,6 +8,7 @@ from rest_framework import status, generics
 from .serializers import UserSerializer, UserDataSerializer, NotificationDataSerializer
 import os
 import cfbd
+import certifi
 import pytz
 from django.http import JsonResponse
 from datetime import date, datetime, timezone, timedelta
@@ -69,7 +70,8 @@ def index(request):
 def get_cached_uf_games():
     configuration = cfbd.Configuration(
         host="https://apinext.collegefootballdata.com",
-        access_token=os.getenv('COLLEGE_FOOTBALL_API_KEY')
+        access_token=os.getenv('COLLEGE_FOOTBALL_API_KEY'),
+        ssl_ca_cert=certifi.where()
     )
     apiInstance = cfbd.GamesApi(cfbd.ApiClient(configuration))
     current_year = date.today().year
@@ -84,6 +86,8 @@ def get_cached_uf_games():
         return games_list
 
     logger.info("Cache miss: Fetching UF games from API.")
+    _key = os.getenv('COLLEGE_FOOTBALL_API_KEY')
+    logger.info(f"CFBD key loaded: {bool(_key)}, length: {len(_key) if _key else 0}")
     try:
         games = apiInstance.get_games(year=current_year, team='Florida', conference='SEC')
         games_list = [game.to_dict() for game in games]
@@ -411,11 +415,16 @@ def poll_cfbd_view(request):
     games = get_cached_uf_games()
     configuration = cfbd.Configuration(
         host="https://apinext.collegefootballdata.com",
-        access_token=os.getenv('COLLEGE_FOOTBALL_API_KEY')
+        access_token=os.getenv('COLLEGE_FOOTBALL_API_KEY'),
+        ssl_ca_cert=certifi.where()
     )
     apiInstance = cfbd.GamesApi(cfbd.ApiClient(configuration))
     CACHE_KEY = "completed_game"
     CACHE_TTL = 60 * 60 * 4 #4 hours -> there won't be more than 1 game/day or /week so this should be fine
+
+    if games is None:
+        logger.error("poll_cfbd_view: failed to retrieve games, skipping poll")
+        return
 
     for game in games:
         start_date = game['startDate']
