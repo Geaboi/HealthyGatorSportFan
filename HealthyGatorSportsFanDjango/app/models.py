@@ -16,6 +16,10 @@ class User(models.Model):
     goal_to_feel_better = models.BooleanField(default=False)
     password = models.CharField(max_length=128, blank=True, null=True)  # Optional if signing in with Google
     push_token = models.CharField(max_length=128, blank=True, null=True)
+    fitbit_user_id = models.CharField(max_length=64, blank=True, null=True)
+    fitbit_access_token = models.TextField(blank=True, null=True)
+    fitbit_refresh_token = models.TextField(blank=True, null=True)
+    fitbit_token_expires = models.DateTimeField(blank=True, null=True)
     #google_acct_id = models.CharField(max_length=255, blank=True, null=True)  # Optional if creating an account directly
 
     USERNAME_FIELD = 'email'

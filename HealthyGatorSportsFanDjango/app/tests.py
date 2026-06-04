@@ -1,5 +1,6 @@
 from unittest.mock import patch, MagicMock
 from django.test import TestCase, override_settings
+from django.utils import timezone
 from rest_framework.test import APIClient
 from rest_framework import status as http_status
 from django.contrib.auth.models import User as AuthUser
@@ -551,3 +552,27 @@ class SendNotificationTests(TestCase):
         mock_cache.get.return_value = None
         send_notification('winning_decisive', 'Florida Gators', 24, 'Alabama', 10)
         mock_cache.set.assert_called_once_with('last_score', '24-10')
+
+
+# ---------------------------------------------------------------------------
+# Model: Fitbit token fields
+# ---------------------------------------------------------------------------
+
+class UserFitbitFieldTests(TestCase):
+
+    def test_user_stores_fitbit_credentials(self):
+        user = make_user()
+        user.fitbit_user_id = 'ABCD1234'
+        user.fitbit_access_token = 'access_token_value'
+        user.fitbit_refresh_token = 'refresh_token_value'
+        user.fitbit_token_expires = timezone.now()
+        user.save()
+        user.refresh_from_db()
+        self.assertEqual(user.fitbit_user_id, 'ABCD1234')
+
+    def test_fitbit_fields_are_nullable(self):
+        user = make_user()
+        self.assertIsNone(user.fitbit_user_id)
+        self.assertIsNone(user.fitbit_access_token)
+        self.assertIsNone(user.fitbit_refresh_token)
+        self.assertIsNone(user.fitbit_token_expires)
