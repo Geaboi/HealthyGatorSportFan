@@ -1,12 +1,14 @@
 from django.contrib import admin
-
-# Register your models here.
-
-# This is for the Django Admin panel used to test the database
-# http://127.0.0.1:8000/admin/
-
-from .models import User, UserData, NotificationData
+from .models import (
+    User, UserData, NotificationData,
+    WearableDevice, HeartRateSample, ActivitySummary, EMA, JITAILog,
+)
 
 admin.site.register(User)
 admin.site.register(UserData)
 admin.site.register(NotificationData)
+admin.site.register(WearableDevice)
+admin.site.register(HeartRateSample)
+admin.site.register(ActivitySummary)
+admin.site.register(EMA)
+admin.site.register(JITAILog)
