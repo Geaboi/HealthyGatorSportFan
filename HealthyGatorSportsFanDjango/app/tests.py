@@ -6,7 +6,7 @@ from rest_framework import status as http_status
 from django.contrib.auth.models import User as AuthUser
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from app.models import User, UserData, NotificationData, WearableDevice, HeartRateSample, ActivitySummary
+from app.models import User, UserData, NotificationData, WearableDevice, HeartRateSample, ActivitySummary, EMA
 from app.utils import check_game_status, send_notification
 
 FAST_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
@@ -695,3 +695,45 @@ class ActivitySummaryModelTests(TestCase):
         ActivitySummary.objects.create(device=device, date='2026-01-01', steps=8000)
         with self.assertRaises(IntegrityError):
             ActivitySummary.objects.create(device=device, date='2026-01-01', steps=9000)
+
+
+# ---------------------------------------------------------------------------
+# Model: EMA
+# ---------------------------------------------------------------------------
+
+class EMAModelTests(TestCase):
+
+    def test_ema_stores_survey_response(self):
+        user = make_user()
+        ema = EMA.objects.create(
+            user=user,
+            mood=7,
+            energy=5,
+            stress=3,
+            physical_activity='moderate',
+        )
+        self.assertEqual(ema.mood, 7)
+        self.assertEqual(ema.energy, 5)
+        self.assertEqual(ema.stress, 3)
+        self.assertEqual(ema.physical_activity, 'moderate')
+
+    def test_timestamp_is_set_automatically(self):
+        user = make_user()
+        ema = EMA.objects.create(user=user)
+        self.assertIsNotNone(ema.timestamp)
+
+    def test_all_fields_are_optional_except_user(self):
+        user = make_user()
+        ema = EMA.objects.create(user=user)
+        self.assertIsNone(ema.mood)
+        self.assertIsNone(ema.energy)
+        self.assertIsNone(ema.stress)
+        self.assertIsNone(ema.physical_activity)
+        self.assertIsNone(ema.weight_lbs)
+        self.assertIsNone(ema.notes)
+
+    def test_deleting_user_deletes_ema_records(self):
+        user = make_user()
+        EMA.objects.create(user=user, mood=5)
+        user.delete()
+        self.assertEqual(EMA.objects.count(), 0)

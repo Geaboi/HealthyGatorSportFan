@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.hashers import make_password, check_password as django_check_password
+from django.core.validators import MinValueValidator, MaxValueValidator
 
 # User model
 class User(models.Model):
@@ -117,3 +118,36 @@ class ActivitySummary(models.Model):
 
     def __str__(self):
         return f"Activity for {self.device} on {self.date}"
+
+
+class EMA(models.Model):
+    ACTIVITY_CHOICES = [
+        ('none', 'None'),
+        ('light', 'Light'),
+        ('moderate', 'Moderate'),
+        ('vigorous', 'Vigorous'),
+    ]
+
+    ema_id = models.AutoField(primary_key=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    mood = models.PositiveSmallIntegerField(
+        blank=True, null=True,
+        validators=[MinValueValidator(1), MaxValueValidator(10)],
+    )
+    energy = models.PositiveSmallIntegerField(
+        blank=True, null=True,
+        validators=[MinValueValidator(1), MaxValueValidator(10)],
+    )
+    stress = models.PositiveSmallIntegerField(
+        blank=True, null=True,
+        validators=[MinValueValidator(1), MaxValueValidator(10)],
+    )
+    physical_activity = models.CharField(
+        max_length=20, choices=ACTIVITY_CHOICES, blank=True, null=True
+    )
+    weight_lbs = models.DecimalField(max_digits=4, decimal_places=1, blank=True, null=True)
+    notes = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return f"EMA for {self.user.email} at {self.timestamp}"
