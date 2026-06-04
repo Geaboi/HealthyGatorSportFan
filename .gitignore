@@ -15,12 +15,16 @@ build/
 # Ignore Python bytecode files
 *.pyc
 __pycache__/
+.venv/
 
 # Ignore environment variables
 .env
 
 # Ignore staticfiles directory
 /staticfiles
+
+#Ignore celerybeat-schedule
+celerybeat-schedule
 
 # Ignore auto generated celery files
 HealthyGatorSportsFanDjango/celerybeat-schedule.bak

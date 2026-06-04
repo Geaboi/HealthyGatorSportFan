@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.hashers import make_password, check_password as django_check_password
+from django.core.validators import MinValueValidator, MaxValueValidator
 
 # User model
 class User(models.Model):
@@ -16,6 +17,10 @@ class User(models.Model):
     goal_to_feel_better = models.BooleanField(default=False)
     password = models.CharField(max_length=128, blank=True, null=True)  # Optional if signing in with Google
     push_token = models.CharField(max_length=128, blank=True, null=True)
+    fitbit_user_id = models.CharField(max_length=64, blank=True, null=True)
+    fitbit_access_token = models.TextField(blank=True, null=True)
+    fitbit_refresh_token = models.TextField(blank=True, null=True)
+    fitbit_token_expires = models.DateTimeField(blank=True, null=True)
     #google_acct_id = models.CharField(max_length=255, blank=True, null=True)  # Optional if creating an account directly
 
     USERNAME_FIELD = 'email'
@@ -64,6 +69,111 @@ class NotificationData(models.Model):
      # When an instance is referenced, prints the user name and timestamp instead of the default "User object (1)"
     def __str__(self):
         return f"Notification for {self.user.email} at {self.timestamp}"
-    
 
-    
+
+# WearableDevice model
+class WearableDevice(models.Model):
+    device_id = models.AutoField(primary_key=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    fitbit_device_id = models.CharField(max_length=64)
+    device_type = models.CharField(max_length=32)
+    device_name = models.CharField(max_length=64)
+    last_synced_at = models.DateTimeField(blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.device_name} ({self.user.email})"
+
+
+class HeartRateSample(models.Model):
+    ZONE_CHOICES = [
+        ('out_of_range', 'Out of Range'),
+        ('fat_burn', 'Fat Burn'),
+        ('cardio', 'Cardio'),
+        ('peak', 'Peak'),
+    ]
+
+    sample_id = models.AutoField(primary_key=True)
+    device = models.ForeignKey(WearableDevice, on_delete=models.CASCADE)
+    timestamp = models.DateTimeField()
+    bpm = models.PositiveSmallIntegerField()
+    zone = models.CharField(max_length=20, choices=ZONE_CHOICES)
+
+    def __str__(self):
+        return f"{self.bpm} bpm at {self.timestamp}"
+
+
+class ActivitySummary(models.Model):
+    summary_id = models.AutoField(primary_key=True)
+    device = models.ForeignKey(WearableDevice, on_delete=models.CASCADE)
+    date = models.DateField()
+    steps = models.PositiveIntegerField(blank=True, null=True)
+    active_minutes = models.PositiveIntegerField(blank=True, null=True)
+    calories_burned = models.PositiveIntegerField(blank=True, null=True)
+    distance_km = models.DecimalField(max_digits=6, decimal_places=3, blank=True, null=True)
+
+    class Meta:
+        unique_together = ('device', 'date')
+
+    def __str__(self):
+        return f"Activity for {self.device} on {self.date}"
+
+
+class EMA(models.Model):
+    ACTIVITY_CHOICES = [
+        ('none', 'None'),
+        ('light', 'Light'),
+        ('moderate', 'Moderate'),
+        ('vigorous', 'Vigorous'),
+    ]
+
+    ema_id = models.AutoField(primary_key=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    mood = models.PositiveSmallIntegerField(
+        blank=True, null=True,
+        validators=[MinValueValidator(1), MaxValueValidator(10)],
+    )
+    energy = models.PositiveSmallIntegerField(
+        blank=True, null=True,
+        validators=[MinValueValidator(1), MaxValueValidator(10)],
+    )
+    stress = models.PositiveSmallIntegerField(
+        blank=True, null=True,
+        validators=[MinValueValidator(1), MaxValueValidator(10)],
+    )
+    physical_activity = models.CharField(
+        max_length=20, choices=ACTIVITY_CHOICES, blank=True, null=True
+    )
+    weight_lbs = models.DecimalField(max_digits=4, decimal_places=1, blank=True, null=True)
+    notes = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return f"EMA for {self.user.email} at {self.timestamp}"
+
+
+class JITAILog(models.Model):
+    PROMPT_STATUS_CHOICES = [
+        ('sent', 'Sent'),
+        ('delivered', 'Delivered'),
+        ('opened', 'Opened'),
+        ('dismissed', 'Dismissed'),
+        ('acted_on', 'Acted On'),
+    ]
+
+    log_id = models.AutoField(primary_key=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    title = models.CharField(max_length=255)
+    message = models.TextField()
+    trigger_reason = models.CharField(max_length=100)
+    volatility_score = models.DecimalField(max_digits=6, decimal_places=3, blank=True, null=True)
+    threshold_used = models.DecimalField(max_digits=6, decimal_places=3, blank=True, null=True)
+    prompt_status = models.CharField(max_length=20, choices=PROMPT_STATUS_CHOICES, default='sent')
+    prompt_count = models.PositiveIntegerField(default=0)
+    opened_at = models.DateTimeField(blank=True, null=True)
+    interacted_at = models.DateTimeField(blank=True, null=True)
+
+    def __str__(self):
+        return f"JITAI for {self.user.email} at {self.timestamp}"

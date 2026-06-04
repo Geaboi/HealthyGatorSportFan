@@ -14,8 +14,8 @@ import os
 
 # For accessing environment variables from your .env file
 from dotenv import load_dotenv
-# Load environment variables from the .env file
-load_dotenv()
+from pathlib import Path as _Path
+load_dotenv(_Path(__file__).resolve().parent.parent / '.env')
 
 from pathlib import Path
 
