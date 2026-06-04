@@ -562,13 +562,17 @@ class UserFitbitFieldTests(TestCase):
 
     def test_user_stores_fitbit_credentials(self):
         user = make_user()
+        expires = timezone.now()
         user.fitbit_user_id = 'ABCD1234'
         user.fitbit_access_token = 'access_token_value'
         user.fitbit_refresh_token = 'refresh_token_value'
-        user.fitbit_token_expires = timezone.now()
+        user.fitbit_token_expires = expires
         user.save()
         user.refresh_from_db()
         self.assertEqual(user.fitbit_user_id, 'ABCD1234')
+        self.assertEqual(user.fitbit_access_token, 'access_token_value')
+        self.assertEqual(user.fitbit_refresh_token, 'refresh_token_value')
+        self.assertIsNotNone(user.fitbit_token_expires)
 
     def test_fitbit_fields_are_nullable(self):
         user = make_user()
