@@ -572,6 +572,7 @@ class SendNotificationTests(TestCase):
 # Model: Fitbit token fields
 # ---------------------------------------------------------------------------
 
+@override_settings(PASSWORD_HASHERS=FAST_HASHERS)
 class UserFitbitFieldTests(TestCase):
 
     def test_user_stores_fitbit_credentials(self):
@@ -600,6 +601,7 @@ class UserFitbitFieldTests(TestCase):
 # Model: WearableDevice
 # ---------------------------------------------------------------------------
 
+@override_settings(PASSWORD_HASHERS=FAST_HASHERS)
 class WearableDeviceModelTests(TestCase):
 
     def test_device_is_linked_to_user(self):
@@ -648,6 +650,7 @@ class WearableDeviceModelTests(TestCase):
 # Model: HeartRateSample
 # ---------------------------------------------------------------------------
 
+@override_settings(PASSWORD_HASHERS=FAST_HASHERS)
 class HeartRateSampleModelTests(TestCase):
 
     def test_sample_links_to_device(self):
@@ -677,6 +680,7 @@ class HeartRateSampleModelTests(TestCase):
 # Model: ActivitySummary
 # ---------------------------------------------------------------------------
 
+@override_settings(PASSWORD_HASHERS=FAST_HASHERS)
 class ActivitySummaryModelTests(TestCase):
 
     def test_summary_links_to_device(self):
@@ -706,6 +710,7 @@ class ActivitySummaryModelTests(TestCase):
 # Model: EMA
 # ---------------------------------------------------------------------------
 
+@override_settings(PASSWORD_HASHERS=FAST_HASHERS)
 class EMAModelTests(TestCase):
 
     def test_ema_stores_survey_response(self):
@@ -758,6 +763,7 @@ class EMAModelTests(TestCase):
 # Model: JITAILog
 # ---------------------------------------------------------------------------
 
+@override_settings(PASSWORD_HASHERS=FAST_HASHERS)
 class JITAILogModelTests(TestCase):
 
     def test_jitai_log_stores_intervention(self):
@@ -817,6 +823,7 @@ class JITAILogModelTests(TestCase):
         self.assertEqual(JITAILog.objects.count(), 0)
 
 
+@override_settings(PASSWORD_HASHERS=FAST_HASHERS)
 class WearableDeviceSerializerTests(TestCase):
 
     def test_serializer_creates_device(self):
@@ -833,6 +840,7 @@ class WearableDeviceSerializerTests(TestCase):
         self.assertEqual(device.device_name, 'Charge 6')
 
 
+@override_settings(PASSWORD_HASHERS=FAST_HASHERS)
 class HeartRateSampleSerializerTests(TestCase):
 
     def test_serializer_creates_sample(self):
@@ -850,6 +858,7 @@ class HeartRateSampleSerializerTests(TestCase):
         self.assertEqual(sample.bpm, 72)
 
 
+@override_settings(PASSWORD_HASHERS=FAST_HASHERS)
 class ActivitySummarySerializerTests(TestCase):
 
     def test_serializer_creates_summary(self):
@@ -867,6 +876,7 @@ class ActivitySummarySerializerTests(TestCase):
         self.assertEqual(summary.steps, 8000)
 
 
+@override_settings(PASSWORD_HASHERS=FAST_HASHERS)
 class EMASerializerTests(TestCase):
 
     def test_serializer_creates_ema(self):
@@ -884,6 +894,7 @@ class EMASerializerTests(TestCase):
         self.assertEqual(ema.mood, 7)
 
 
+@override_settings(PASSWORD_HASHERS=FAST_HASHERS)
 class JITAILogSerializerTests(TestCase):
 
     def test_serializer_creates_jitai_log(self):
