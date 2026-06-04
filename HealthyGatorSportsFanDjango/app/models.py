@@ -83,3 +83,37 @@ class WearableDevice(models.Model):
 
     def __str__(self):
         return f"{self.device_name} ({self.user.email})"
+
+
+class HeartRateSample(models.Model):
+    ZONE_CHOICES = [
+        ('out_of_range', 'Out of Range'),
+        ('fat_burn', 'Fat Burn'),
+        ('cardio', 'Cardio'),
+        ('peak', 'Peak'),
+    ]
+
+    sample_id = models.AutoField(primary_key=True)
+    device = models.ForeignKey(WearableDevice, on_delete=models.CASCADE)
+    timestamp = models.DateTimeField()
+    bpm = models.PositiveSmallIntegerField()
+    zone = models.CharField(max_length=20, choices=ZONE_CHOICES)
+
+    def __str__(self):
+        return f"{self.bpm} bpm at {self.timestamp}"
+
+
+class ActivitySummary(models.Model):
+    summary_id = models.AutoField(primary_key=True)
+    device = models.ForeignKey(WearableDevice, on_delete=models.CASCADE)
+    date = models.DateField()
+    steps = models.PositiveIntegerField(blank=True, null=True)
+    active_minutes = models.PositiveIntegerField(blank=True, null=True)
+    calories_burned = models.PositiveIntegerField(blank=True, null=True)
+    distance_km = models.DecimalField(max_digits=6, decimal_places=3, blank=True, null=True)
+
+    class Meta:
+        unique_together = ('device', 'date')
+
+    def __str__(self):
+        return f"Activity for {self.device} on {self.date}"

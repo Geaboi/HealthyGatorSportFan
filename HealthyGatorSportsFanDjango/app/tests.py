@@ -6,7 +6,7 @@ from rest_framework import status as http_status
 from django.contrib.auth.models import User as AuthUser
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from app.models import User, UserData, NotificationData, WearableDevice
+from app.models import User, UserData, NotificationData, WearableDevice, HeartRateSample, ActivitySummary
 from app.utils import check_game_status, send_notification
 
 FAST_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
@@ -19,6 +19,15 @@ def make_user(email='test@example.com', password='testpass123', **kwargs):
     user.set_password(password)
     user.save()
     return user
+
+
+def make_device(user, fitbit_device_id='DEV001', device_type='tracker', device_name='Charge 6'):
+    return WearableDevice.objects.create(
+        user=user,
+        fitbit_device_id=fitbit_device_id,
+        device_type=device_type,
+        device_name=device_name,
+    )
 
 
 def make_game(home_name, home_pts, away_name, away_pts, game_status):
@@ -628,3 +637,61 @@ class WearableDeviceModelTests(TestCase):
         )
         user.delete()
         self.assertEqual(WearableDevice.objects.count(), 0)
+
+
+# ---------------------------------------------------------------------------
+# Model: HeartRateSample
+# ---------------------------------------------------------------------------
+
+class HeartRateSampleModelTests(TestCase):
+
+    def test_sample_links_to_device(self):
+        user = make_user()
+        device = make_device(user)
+        sample = HeartRateSample.objects.create(
+            device=device,
+            timestamp=timezone.now(),
+            bpm=72,
+            zone='fat_burn',
+        )
+        self.assertEqual(sample.device, device)
+        self.assertEqual(sample.bpm, 72)
+        self.assertEqual(sample.zone, 'fat_burn')
+
+    def test_deleting_device_deletes_samples(self):
+        user = make_user()
+        device = make_device(user)
+        HeartRateSample.objects.create(
+            device=device, timestamp=timezone.now(), bpm=80, zone='cardio'
+        )
+        device.delete()
+        self.assertEqual(HeartRateSample.objects.count(), 0)
+
+
+# ---------------------------------------------------------------------------
+# Model: ActivitySummary
+# ---------------------------------------------------------------------------
+
+class ActivitySummaryModelTests(TestCase):
+
+    def test_summary_links_to_device(self):
+        user = make_user()
+        device = make_device(user)
+        summary = ActivitySummary.objects.create(
+            device=device,
+            date='2026-01-01',
+            steps=8000,
+            active_minutes=45,
+            calories_burned=350,
+            distance_km=6.500,
+        )
+        self.assertEqual(summary.device, device)
+        self.assertEqual(summary.steps, 8000)
+
+    def test_duplicate_device_date_raises_error(self):
+        from django.db import IntegrityError
+        user = make_user()
+        device = make_device(user)
+        ActivitySummary.objects.create(device=device, date='2026-01-01', steps=8000)
+        with self.assertRaises(IntegrityError):
+            ActivitySummary.objects.create(device=device, date='2026-01-01', steps=9000)
