@@ -6,7 +6,7 @@ from rest_framework import status as http_status
 from django.contrib.auth.models import User as AuthUser
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from app.models import User, UserData, NotificationData, WearableDevice, HeartRateSample, ActivitySummary, EMA
+from app.models import User, UserData, NotificationData, WearableDevice, HeartRateSample, ActivitySummary, EMA, JITAILog
 from app.utils import check_game_status, send_notification
 
 FAST_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
@@ -747,3 +747,63 @@ class EMAModelTests(TestCase):
         ema_high = EMA(user=user, mood=11)
         with self.assertRaises(ValidationError):
             ema_high.full_clean()
+
+
+# ---------------------------------------------------------------------------
+# Model: JITAILog
+# ---------------------------------------------------------------------------
+
+class JITAILogModelTests(TestCase):
+
+    def test_jitai_log_stores_intervention(self):
+        user = make_user()
+        log = JITAILog.objects.create(
+            user=user,
+            title='Move more!',
+            message='You have been inactive for 2 hours.',
+            trigger_reason='low_steps',
+            volatility_score=0.720,
+            threshold_used=0.650,
+            prompt_count=3,
+        )
+        self.assertEqual(log.trigger_reason, 'low_steps')
+        self.assertEqual(log.title, 'Move more!')
+
+    def test_prompt_status_defaults_to_sent(self):
+        user = make_user()
+        log = JITAILog.objects.create(
+            user=user,
+            title='Move!',
+            message='Get up.',
+            trigger_reason='low_steps',
+        )
+        self.assertEqual(log.prompt_status, 'sent')
+
+    def test_opened_at_and_interacted_at_are_nullable(self):
+        user = make_user()
+        log = JITAILog.objects.create(
+            user=user,
+            title='Move!',
+            message='Get up.',
+            trigger_reason='low_steps',
+        )
+        self.assertIsNone(log.opened_at)
+        self.assertIsNone(log.interacted_at)
+
+    def test_timestamp_is_set_automatically(self):
+        user = make_user()
+        log = JITAILog.objects.create(
+            user=user,
+            title='Move!',
+            message='Get up.',
+            trigger_reason='low_steps',
+        )
+        self.assertIsNotNone(log.timestamp)
+
+    def test_deleting_user_deletes_jitai_logs(self):
+        user = make_user()
+        JITAILog.objects.create(
+            user=user, title='Hi', message='Go.', trigger_reason='low_steps'
+        )
+        user.delete()
+        self.assertEqual(JITAILog.objects.count(), 0)
