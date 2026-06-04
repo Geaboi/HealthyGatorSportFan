@@ -768,6 +768,9 @@ class JITAILogModelTests(TestCase):
         )
         self.assertEqual(log.trigger_reason, 'low_steps')
         self.assertEqual(log.title, 'Move more!')
+        self.assertEqual(log.prompt_count, 3)
+        self.assertIsNotNone(log.volatility_score)
+        self.assertIsNotNone(log.threshold_used)
 
     def test_prompt_status_defaults_to_sent(self):
         user = make_user()
