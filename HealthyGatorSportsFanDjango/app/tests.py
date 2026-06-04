@@ -7,6 +7,11 @@ from django.contrib.auth.models import User as AuthUser
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from app.models import User, UserData, NotificationData, WearableDevice, HeartRateSample, ActivitySummary, EMA, JITAILog
+from app.serializers import (
+    UserSerializer, UserDataSerializer, NotificationDataSerializer,
+    WearableDeviceSerializer, HeartRateSampleSerializer,
+    ActivitySummarySerializer, EMASerializer, JITAILogSerializer,
+)
 from app.utils import check_game_status, send_notification
 
 FAST_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
@@ -810,3 +815,88 @@ class JITAILogModelTests(TestCase):
         )
         user.delete()
         self.assertEqual(JITAILog.objects.count(), 0)
+
+
+class WearableDeviceSerializerTests(TestCase):
+
+    def test_serializer_creates_device(self):
+        user = make_user()
+        data = {
+            'user': user.user_id,
+            'fitbit_device_id': 'DEV001',
+            'device_type': 'tracker',
+            'device_name': 'Charge 6',
+        }
+        serializer = WearableDeviceSerializer(data=data)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        device = serializer.save()
+        self.assertEqual(device.device_name, 'Charge 6')
+
+
+class HeartRateSampleSerializerTests(TestCase):
+
+    def test_serializer_creates_sample(self):
+        user = make_user()
+        device = make_device(user)
+        data = {
+            'device': device.device_id,
+            'timestamp': '2026-01-01T10:00:00Z',
+            'bpm': 72,
+            'zone': 'fat_burn',
+        }
+        serializer = HeartRateSampleSerializer(data=data)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        sample = serializer.save()
+        self.assertEqual(sample.bpm, 72)
+
+
+class ActivitySummarySerializerTests(TestCase):
+
+    def test_serializer_creates_summary(self):
+        user = make_user()
+        device = make_device(user)
+        data = {
+            'device': device.device_id,
+            'date': '2026-01-01',
+            'steps': 8000,
+            'active_minutes': 45,
+        }
+        serializer = ActivitySummarySerializer(data=data)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        summary = serializer.save()
+        self.assertEqual(summary.steps, 8000)
+
+
+class EMASerializerTests(TestCase):
+
+    def test_serializer_creates_ema(self):
+        user = make_user()
+        data = {
+            'user': user.user_id,
+            'mood': 7,
+            'energy': 5,
+            'stress': 3,
+            'physical_activity': 'moderate',
+        }
+        serializer = EMASerializer(data=data)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        ema = serializer.save()
+        self.assertEqual(ema.mood, 7)
+
+
+class JITAILogSerializerTests(TestCase):
+
+    def test_serializer_creates_jitai_log(self):
+        user = make_user()
+        data = {
+            'user': user.user_id,
+            'title': 'Move more!',
+            'message': 'You have been inactive for 2 hours.',
+            'trigger_reason': 'low_steps',
+            'prompt_count': 1,
+        }
+        serializer = JITAILogSerializer(data=data)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        log = serializer.save()
+        self.assertEqual(log.trigger_reason, 'low_steps')
+        self.assertEqual(log.prompt_status, 'sent')

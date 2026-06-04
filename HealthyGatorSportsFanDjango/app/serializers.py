@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import UserData, User, NotificationData
+from .models import UserData, User, NotificationData, WearableDevice, HeartRateSample, ActivitySummary, EMA, JITAILog
 from django.contrib.auth.hashers import make_password
 
 import logging
@@ -110,3 +110,38 @@ class NotificationDataSerializer(serializers.ModelSerializer):
         model = NotificationData
         fields = '__all__'  # Or specify the fields you want to include
         # fields = ['user', 'notification_title','notification_message', 'read_status']
+
+
+class WearableDeviceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WearableDevice
+        fields = '__all__'
+        read_only_fields = ('device_id', 'created_at')
+
+
+class HeartRateSampleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = HeartRateSample
+        fields = '__all__'
+        read_only_fields = ('sample_id',)
+
+
+class ActivitySummarySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ActivitySummary
+        fields = '__all__'
+        read_only_fields = ('summary_id',)
+
+
+class EMASerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EMA
+        fields = '__all__'
+        read_only_fields = ('ema_id', 'timestamp')
+
+
+class JITAILogSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = JITAILog
+        fields = '__all__'
+        read_only_fields = ('log_id', 'timestamp')
