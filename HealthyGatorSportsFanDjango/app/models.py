@@ -68,6 +68,18 @@ class NotificationData(models.Model):
      # When an instance is referenced, prints the user name and timestamp instead of the default "User object (1)"
     def __str__(self):
         return f"Notification for {self.user.email} at {self.timestamp}"
-    
 
-    
+
+# WearableDevice model
+class WearableDevice(models.Model):
+    device_id = models.AutoField(primary_key=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    fitbit_device_id = models.CharField(max_length=64)
+    device_type = models.CharField(max_length=32)
+    device_name = models.CharField(max_length=64)
+    last_synced_at = models.DateTimeField(blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.device_name} ({self.user.email})"

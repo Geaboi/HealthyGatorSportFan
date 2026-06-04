@@ -6,7 +6,7 @@ from rest_framework import status as http_status
 from django.contrib.auth.models import User as AuthUser
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from app.models import User, UserData, NotificationData
+from app.models import User, UserData, NotificationData, WearableDevice
 from app.utils import check_game_status, send_notification
 
 FAST_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
@@ -580,3 +580,51 @@ class UserFitbitFieldTests(TestCase):
         self.assertIsNone(user.fitbit_access_token)
         self.assertIsNone(user.fitbit_refresh_token)
         self.assertIsNone(user.fitbit_token_expires)
+
+
+# ---------------------------------------------------------------------------
+# Model: WearableDevice
+# ---------------------------------------------------------------------------
+
+class WearableDeviceModelTests(TestCase):
+
+    def test_device_is_linked_to_user(self):
+        user = make_user()
+        device = WearableDevice.objects.create(
+            user=user,
+            fitbit_device_id='ABCD1234',
+            device_type='tracker',
+            device_name='Charge 6',
+        )
+        self.assertEqual(device.user, user)
+
+    def test_is_active_defaults_to_true(self):
+        user = make_user()
+        device = WearableDevice.objects.create(
+            user=user,
+            fitbit_device_id='ABCD1234',
+            device_type='tracker',
+            device_name='Charge 6',
+        )
+        self.assertTrue(device.is_active)
+
+    def test_created_at_is_set_automatically(self):
+        user = make_user()
+        device = WearableDevice.objects.create(
+            user=user,
+            fitbit_device_id='ABCD1234',
+            device_type='tracker',
+            device_name='Charge 6',
+        )
+        self.assertIsNotNone(device.created_at)
+
+    def test_deleting_user_deletes_device(self):
+        user = make_user()
+        WearableDevice.objects.create(
+            user=user,
+            fitbit_device_id='ABCD1234',
+            device_type='tracker',
+            device_name='Charge 6',
+        )
+        user.delete()
+        self.assertEqual(WearableDevice.objects.count(), 0)
