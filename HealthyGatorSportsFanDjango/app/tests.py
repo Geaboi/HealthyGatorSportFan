@@ -737,3 +737,13 @@ class EMAModelTests(TestCase):
         EMA.objects.create(user=user, mood=5)
         user.delete()
         self.assertEqual(EMA.objects.count(), 0)
+
+    def test_mood_rejects_out_of_range_values(self):
+        from django.core.exceptions import ValidationError
+        user = make_user()
+        ema_low = EMA(user=user, mood=0)
+        with self.assertRaises(ValidationError):
+            ema_low.full_clean()
+        ema_high = EMA(user=user, mood=11)
+        with self.assertRaises(ValidationError):
+            ema_high.full_clean()
