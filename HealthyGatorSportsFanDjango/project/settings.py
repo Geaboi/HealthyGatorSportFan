@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 # For accessing environment variables
 import os
+import dj_database_url
 
 # For accessing environment variables from your .env file
 from dotenv import load_dotenv
@@ -42,6 +43,7 @@ DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 
 ALLOWED_HOSTS = [
     'healthygatorsportsfan-84ee3c84673f.herokuapp.com',
+    'healthygatorsportfan.herokuapp.com',
     '127.0.0.1', 
     'localhost', 
     '192.168.68.124', 
@@ -130,9 +132,15 @@ TEMPLATES = [
 # Database configuration
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
-# Check if running on Cloud Run (production)
-if os.getenv('K_SERVICE'):
-    # Cloud SQL configuration for production
+if os.getenv('DATABASE_URL'):
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=os.getenv('DATABASE_URL'),
+            conn_max_age=600,
+            ssl_require=True,
+        )
+    }
+elif os.getenv('K_SERVICE'):
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
@@ -144,7 +152,6 @@ if os.getenv('K_SERVICE'):
         }
     }
 else:
-    # Local development database
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
@@ -208,19 +215,13 @@ CSRF_TRUSTED_ORIGINS = [
     'https://sawfish-premium-unlikely.ngrok-free.app',
     'https://strongly-inviting-stinkbug.ngrok-free.app',
     'https://healthygatorsportsfan-84ee3c84673f.herokuapp.com',
+    'https://healthygatorsportfan.herokuapp.com',
     'https://tuna-fleet-hamster.ngrok-free.app'
 ]
 
-# Celery configuration
-if os.getenv('K_SERVICE'):
-    # Production Redis configuration for Cloud Run
-    REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
-    CELERY_BROKER_URL = REDIS_URL
-    CELERY_RESULT_BACKEND = REDIS_URL
-else:
-    # Local Redis configuration
-    CELERY_BROKER_URL = 'redis://localhost:6379/0'
-    CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+CELERY_BROKER_URL = REDIS_URL
+CELERY_RESULT_BACKEND = REDIS_URL
 
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
@@ -233,12 +234,6 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': schedule(120.0),  # 10 seconds
     },
 }
-
-# Redis cache configuration
-if os.getenv('K_SERVICE'):
-    REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
-else:
-    REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
 
 CACHES = {
     'default': {
