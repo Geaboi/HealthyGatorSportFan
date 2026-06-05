@@ -15,6 +15,7 @@ coreschema==0.0.4
 dj-database-url==2.3.0
 Django==5.1.1
 django-cors-headers==4.5.0
+django-redis==5.4.0
 djangorestframework==3.15.2
 djangorestframework-simplejwt==5.5.1
 drf-yasg==1.21.8
