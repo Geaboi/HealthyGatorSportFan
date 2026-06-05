@@ -44,6 +44,7 @@ DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 ALLOWED_HOSTS = [
     'healthygatorsportsfan-84ee3c84673f.herokuapp.com',
     'healthygatorsportfan.herokuapp.com',
+    'healthygatorsportfan-ab9271b02569.herokuapp.com',
     '127.0.0.1', 
     'localhost', 
     '192.168.68.124', 
@@ -59,6 +60,8 @@ ALLOWED_HOSTS = [
 if os.getenv('K_SERVICE'):
     ALLOWED_HOSTS.append(f'{os.getenv("K_SERVICE")}-{os.getenv("K_REVISION")}.{os.getenv("K_CONFIGURATION")}-{os.getenv("GOOGLE_CLOUD_PROJECT")}.uc.r.appspot.com')
     ALLOWED_HOSTS.append(f'{os.getenv("K_SERVICE")}-{os.getenv("GOOGLE_CLOUD_PROJECT")}.uc.r.appspot.com')
+if os.getenv('HEROKU_APP_NAME'):
+    ALLOWED_HOSTS.append(f'{os.getenv("HEROKU_APP_NAME")}.herokuapp.com')
 
 
 # Application definition
@@ -201,7 +204,8 @@ STATIC_URL = 'static/'
 
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles') # HealthyGatorSportsFanDjango/staticfiles
 
-STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
+STATIC_DIR = os.path.join(BASE_DIR, 'static')
+STATICFILES_DIRS = [STATIC_DIR] if os.path.isdir(STATIC_DIR) else []
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Default primary key field type
@@ -216,8 +220,11 @@ CSRF_TRUSTED_ORIGINS = [
     'https://strongly-inviting-stinkbug.ngrok-free.app',
     'https://healthygatorsportsfan-84ee3c84673f.herokuapp.com',
     'https://healthygatorsportfan.herokuapp.com',
+    'https://healthygatorsportfan-ab9271b02569.herokuapp.com',
     'https://tuna-fleet-hamster.ngrok-free.app'
 ]
+if os.getenv('HEROKU_APP_NAME'):
+    CSRF_TRUSTED_ORIGINS.append(f'https://{os.getenv("HEROKU_APP_NAME")}.herokuapp.com')
 
 REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
 CELERY_BROKER_URL = REDIS_URL
