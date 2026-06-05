@@ -135,12 +135,14 @@ TEMPLATES = [
 # Database configuration
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
-if os.getenv('DATABASE_URL'):
+database_url = os.getenv('DATABASE_URL')
+
+if database_url:
     DATABASES = {
         'default': dj_database_url.config(
-            default=os.getenv('DATABASE_URL'),
+            default=database_url,
             conn_max_age=600,
-            ssl_require=True,
+            ssl_require=database_url.startswith('postgres://') or database_url.startswith('postgresql://'),
         )
     }
 elif os.getenv('K_SERVICE'):
