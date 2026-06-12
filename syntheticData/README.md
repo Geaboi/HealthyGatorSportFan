@@ -12,7 +12,7 @@ Synthetic data generation for EMA (Ecological Momentary Assessment) and heart ra
 
 We are focusing on qualitative (EMA) and quantitative simulation (HR + HRV + stress), so other quantitative values (steps, sleep, etc,..) are omitted for the purpose of simulation concept review and simplicity of debugging.
 
-The wearable profile simulates the **Garmin** line (Venu 3 / Vivoactive 5/6) rather than Fitbit: heart-rate samples carry a `source` flag and an HRV value, and a Garmin-style 0–100 stress score is derived from continuous HRV.
+The wearable profile simulates the **Garmin** line (Venu 3 / Vivoactive 5/6) rather than Fitbit: heart-rate samples carry a `source` flag and an HRV value, and a Garmin-style 0–100 stress score is derived from continuous HR.
 
 ## Quick start
 
@@ -69,7 +69,7 @@ Core data generation module. Contains two generators:
 
   Hence, given that HR is measured in minute0level, we guess a baseline HR , where $baseline ~ Uniform(35,75)$ with:
 
-  $$ z_d = \phi * z_{d-1} + e_d$$
+  $$ z_d = \phi * z_{d-1} + e_d $$
 
   where coefficient $\phi$ is how we want to scale different demographics. 
 
@@ -103,7 +103,7 @@ python db_seed.py --users 100 --days 7 --reset
 DATABASE_URL=postgres://... python db_seed.py --users 100 --reset   # any Django DB
 ```
 
-#### First-Order Autoregressive Model
+### First-Order Autoregressive Model
 
 *['Autoregressions', Economics-With-R](<https://www.econometrics-with-r.org/14.3-autoregressions.html>)*
 
