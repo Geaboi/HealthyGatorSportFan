@@ -1,11 +1,25 @@
 from django.contrib.auth.models import User as AuthUser
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.shortcuts import render
-from .models import User, UserData, NotificationData
+from .models import (
+    ActivitySummary,
+    EMA,
+    HeartRateSample,
+    JITAILog,
+    NotificationData,
+    User,
+    UserData,
+    WearableDevice,
+)
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, generics
-from .serializers import UserSerializer, UserDataSerializer, NotificationDataSerializer
+from .serializers import (
+    NotificationDataSerializer,
+    TelemetryIngestSerializer,
+    UserDataSerializer,
+    UserSerializer,
+)
 import os
 import cfbd
 import certifi
@@ -393,6 +407,94 @@ class DeleteNotificationView(APIView):
             return Response(status=status.HTTP_204_NO_CONTENT)
         except NotificationData.DoesNotExist:
             return Response(status=status.HTTP_404_NOT_FOUND)
+
+
+class TelemetryIngestView(APIView):
+    @swagger_auto_schema(
+        operation_summary="Ingest phone telemetry",
+        operation_description=(
+            "Store content-free phone telemetry into the current wearable, heart rate, "
+            "activity, EMA, and JITAI tables."
+        ),
+        request_body=TelemetryIngestSerializer,
+    )
+    def post(self, request):
+        serializer = TelemetryIngestSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        data = serializer.validated_data
+        try:
+            user = User.objects.get(user_id=data["user_id"])
+        except User.DoesNotExist:
+            return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        device_payload = data.get("wearable_device") or {}
+        device = None
+        if device_payload:
+            device, _ = WearableDevice.objects.update_or_create(
+                user=user,
+                fitbit_device_id=device_payload["fitbit_device_id"],
+                defaults={
+                    "device_type": device_payload.get("device_type", "tracker"),
+                    "device_name": device_payload.get("device_name", "Phone Telemetry Device"),
+                    "last_synced_at": device_payload.get("last_synced_at"),
+                    "is_active": device_payload.get("is_active", True),
+                },
+            )
+        elif data.get("heart_rate_samples") or data.get("activity_summaries"):
+            device, _ = WearableDevice.objects.get_or_create(
+                user=user,
+                fitbit_device_id=f"phone-telemetry-{user.user_id}",
+                defaults={
+                    "device_type": "phone",
+                    "device_name": "Phone Telemetry Device",
+                    "is_active": True,
+                },
+            )
+
+        created_counts = {
+            "heart_rate_samples": 0,
+            "activity_summaries": 0,
+            "emas": 0,
+            "jitai_logs": 0,
+        }
+
+        for sample in data.get("heart_rate_samples", []):
+            HeartRateSample.objects.create(device=device, **sample)
+            created_counts["heart_rate_samples"] += 1
+
+        for summary in data.get("activity_summaries", []):
+            summary_defaults = {
+                "steps": summary.get("steps"),
+                "active_minutes": summary.get("active_minutes"),
+                "calories_burned": summary.get("calories_burned"),
+                "distance_km": summary.get("distance_km"),
+            }
+            ActivitySummary.objects.update_or_create(
+                device=device,
+                date=summary["date"],
+                defaults=summary_defaults,
+            )
+            created_counts["activity_summaries"] += 1
+
+        for ema in data.get("emas", []):
+            EMA.objects.create(user=user, **ema)
+            created_counts["emas"] += 1
+
+        for log in data.get("jitai_logs", []):
+            JITAILog.objects.create(user=user, **log)
+            created_counts["jitai_logs"] += 1
+
+        return Response(
+            {
+                "message": "Telemetry ingested.",
+                "user_id": user.user_id,
+                "device_id": device.device_id if device else None,
+                "counts": created_counts,
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
 # class SendNotificationView(APIView):

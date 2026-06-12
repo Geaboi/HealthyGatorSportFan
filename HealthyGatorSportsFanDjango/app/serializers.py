@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import UserData, User, NotificationData, WearableDevice, HeartRateSample, ActivitySummary, EMA, JITAILog
 from django.contrib.auth.hashers import make_password
+from decimal import Decimal
 
 import logging
 
@@ -145,3 +146,85 @@ class JITAILogSerializer(serializers.ModelSerializer):
         model = JITAILog
         fields = '__all__'
         read_only_fields = ('log_id', 'timestamp')
+
+
+class TelemetryWearableDeviceSerializer(serializers.Serializer):
+    fitbit_device_id = serializers.CharField(max_length=64)
+    device_type = serializers.CharField(max_length=32, required=False, default='tracker')
+    device_name = serializers.CharField(max_length=64, required=False, default='Phone Telemetry Device')
+    last_synced_at = serializers.DateTimeField(required=False, allow_null=True)
+    is_active = serializers.BooleanField(required=False, default=True)
+
+
+class TelemetryHeartRateSampleSerializer(serializers.Serializer):
+    timestamp = serializers.DateTimeField()
+    bpm = serializers.IntegerField(min_value=1, max_value=255)
+    zone = serializers.ChoiceField(choices=HeartRateSample.ZONE_CHOICES)
+
+
+class TelemetryActivitySummarySerializer(serializers.Serializer):
+    date = serializers.DateField()
+    steps = serializers.IntegerField(min_value=0, required=False, allow_null=True)
+    active_minutes = serializers.IntegerField(min_value=0, required=False, allow_null=True)
+    calories_burned = serializers.IntegerField(min_value=0, required=False, allow_null=True)
+    distance_km = serializers.DecimalField(
+        max_digits=6,
+        decimal_places=3,
+        min_value=Decimal('0'),
+        required=False,
+        allow_null=True,
+    )
+
+
+class TelemetryEMASerializer(serializers.Serializer):
+    mood = serializers.IntegerField(min_value=1, max_value=10, required=False, allow_null=True)
+    energy = serializers.IntegerField(min_value=1, max_value=10, required=False, allow_null=True)
+    stress = serializers.IntegerField(min_value=1, max_value=10, required=False, allow_null=True)
+    physical_activity = serializers.ChoiceField(
+        choices=EMA.ACTIVITY_CHOICES,
+        required=False,
+        allow_null=True,
+        allow_blank=True,
+    )
+    weight_lbs = serializers.DecimalField(
+        max_digits=4,
+        decimal_places=1,
+        required=False,
+        allow_null=True,
+    )
+    notes = serializers.CharField(required=False, allow_blank=True, default='')
+
+
+class TelemetryJITAILogSerializer(serializers.Serializer):
+    title = serializers.CharField(max_length=255, required=False, default='JITAI prompt')
+    message = serializers.CharField(required=False, default='Prompt issued')
+    trigger_reason = serializers.CharField(max_length=100)
+    volatility_score = serializers.DecimalField(
+        max_digits=6,
+        decimal_places=3,
+        required=False,
+        allow_null=True,
+    )
+    threshold_used = serializers.DecimalField(
+        max_digits=6,
+        decimal_places=3,
+        required=False,
+        allow_null=True,
+    )
+    prompt_status = serializers.ChoiceField(
+        choices=JITAILog.PROMPT_STATUS_CHOICES,
+        required=False,
+        default='sent',
+    )
+    prompt_count = serializers.IntegerField(min_value=0, required=False, default=0)
+    opened_at = serializers.DateTimeField(required=False, allow_null=True)
+    interacted_at = serializers.DateTimeField(required=False, allow_null=True)
+
+
+class TelemetryIngestSerializer(serializers.Serializer):
+    user_id = serializers.IntegerField()
+    wearable_device = TelemetryWearableDeviceSerializer(required=False)
+    heart_rate_samples = TelemetryHeartRateSampleSerializer(many=True, required=False, default=list)
+    activity_summaries = TelemetryActivitySummarySerializer(many=True, required=False, default=list)
+    emas = TelemetryEMASerializer(many=True, required=False, default=list)
+    jitai_logs = TelemetryJITAILogSerializer(many=True, required=False, default=list)

@@ -911,3 +911,110 @@ class JITAILogSerializerTests(TestCase):
         log = serializer.save()
         self.assertEqual(log.trigger_reason, 'low_steps')
         self.assertEqual(log.prompt_status, 'sent')
+
+
+# ---------------------------------------------------------------------------
+# API: POST /telemetry/ingest/ — TelemetryIngestView
+# ---------------------------------------------------------------------------
+
+@override_settings(PASSWORD_HASHERS=FAST_HASHERS)
+class TelemetryIngestViewTests(TestCase):
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = make_user(email='telemetry@example.com')
+
+    def _payload(self):
+        return {
+            'user_id': self.user.user_id,
+            'wearable_device': {
+                'fitbit_device_id': 'PHONE-001',
+                'device_type': 'phone',
+                'device_name': 'Matt POC Phone',
+                'is_active': True,
+            },
+            'heart_rate_samples': [
+                {
+                    'timestamp': '2026-06-12T14:00:00Z',
+                    'bpm': 82,
+                    'zone': 'fat_burn',
+                }
+            ],
+            'activity_summaries': [
+                {
+                    'date': '2026-06-12',
+                    'steps': 8400,
+                    'active_minutes': 52,
+                    'calories_burned': 430,
+                    'distance_km': '6.250',
+                }
+            ],
+            'emas': [
+                {
+                    'mood': 7,
+                    'energy': 6,
+                    'stress': 3,
+                    'physical_activity': 'moderate',
+                    'weight_lbs': '182.5',
+                    'notes': '',
+                }
+            ],
+            'jitai_logs': [
+                {
+                    'title': 'JITAI prompt',
+                    'message': 'Prompt issued',
+                    'trigger_reason': 'low_activity',
+                    'volatility_score': '0.720',
+                    'threshold_used': '0.650',
+                    'prompt_status': 'sent',
+                    'prompt_count': 1,
+                }
+            ],
+        }
+
+    def test_valid_payload_creates_telemetry_records(self):
+        response = self.client.post('/telemetry/ingest/', self._payload(), format='json')
+
+        self.assertEqual(response.status_code, http_status.HTTP_201_CREATED)
+        self.assertEqual(WearableDevice.objects.filter(user=self.user).count(), 1)
+        self.assertEqual(HeartRateSample.objects.count(), 1)
+        self.assertEqual(ActivitySummary.objects.count(), 1)
+        self.assertEqual(EMA.objects.count(), 1)
+        self.assertEqual(JITAILog.objects.count(), 1)
+        self.assertEqual(response.data['counts']['heart_rate_samples'], 1)
+
+    def test_missing_user_id_returns_400(self):
+        payload = self._payload()
+        payload.pop('user_id')
+
+        response = self.client.post('/telemetry/ingest/', payload, format='json')
+
+        self.assertEqual(response.status_code, http_status.HTTP_400_BAD_REQUEST)
+
+    def test_unknown_user_returns_404(self):
+        payload = self._payload()
+        payload['user_id'] = 99999
+
+        response = self.client.post('/telemetry/ingest/', payload, format='json')
+
+        self.assertEqual(response.status_code, http_status.HTTP_404_NOT_FOUND)
+
+    def test_invalid_heart_rate_zone_returns_400(self):
+        payload = self._payload()
+        payload['heart_rate_samples'][0]['zone'] = 'invalid_zone'
+
+        response = self.client.post('/telemetry/ingest/', payload, format='json')
+
+        self.assertEqual(response.status_code, http_status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(HeartRateSample.objects.count(), 0)
+
+    def test_repeated_activity_summary_updates_existing_record(self):
+        payload = self._payload()
+        self.client.post('/telemetry/ingest/', payload, format='json')
+        payload['activity_summaries'][0]['steps'] = 9000
+
+        response = self.client.post('/telemetry/ingest/', payload, format='json')
+
+        self.assertEqual(response.status_code, http_status.HTTP_201_CREATED)
+        self.assertEqual(ActivitySummary.objects.count(), 1)
+        self.assertEqual(ActivitySummary.objects.get().steps, 9000)
