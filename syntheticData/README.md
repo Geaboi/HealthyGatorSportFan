@@ -61,15 +61,21 @@ Core data generation module. Contains two generators:
   - Note: HRV and stress are **analysis-only** -- they are generated for figures/inspection but **not** persisted (the live Django schema has no columns for them; see `db_seed.py`).
     - Parameters are tweakable in `synthetic_generator.py`
 
-  $$ RMSSD = \sqrt{\frac{1}{N-1}\sum_{i=1}^{N-1}(RR_{i+1} - RR_i)^2} $$
+  $$
+  RMSSD = \sqrt{\frac{1}{N-1}\sum_{i=1}^{N-1}(RR_{i+1} - RR_i)^2}
+  $$
 
-  $$ BPM = \frac{60,000}{RR interval (ms)} $$
+  $$
+  BPM = \frac{60,000}{RR interval (ms)}
+  $$
 
   Constraint: RR measures the exact time (in milliseconds) between individual heartbeats, in which requires beat-to-beat HR recording assumption. 
 
   Hence, given that HR is measured in minute0level, we guess a baseline HR , where $baseline ~ Uniform(35,75)$ with:
 
-  $$ z_d = \phi * z_{d-1} + e_d $$
+  $$
+  z_d = \phi * z_{d-1} + e_d
+  $$
 
   where coefficient $\phi$ is how we want to scale different demographics. 
 
