@@ -1,0 +1,10 @@
+# Standalone research module dependencies (separate from the Django app).
+# db_seed.py writes into the Django DB but only needs SQLAlchemy + a driver;
+# the Django schema itself is created by the app's own migrations.
+numpy
+pandas
+matplotlib
+scipy
+SQLAlchemy>=2.0
+# Optional DB drivers for db_seed.py when targeting a non-sqlite DATABASE_URL:
+# psycopg2-binary   # Postgres (e.g. Heroku)
