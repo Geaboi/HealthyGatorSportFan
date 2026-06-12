@@ -5,10 +5,10 @@ Before we trust MSSD (Mean of Squared Successive Differences) as a measure of
 temporal instability, we have to show that it *recovers* the latent volatility
 we baked into the AR(1) EMA generator. This script:
 
-  1. Generates sub-cohorts with KNOWN latent parameters (sigma, rho), spanning a
-     grid from Stable (low sigma / high rho) to Volatile (high sigma / low rho).
-  2. Computes the empirical MSSD on the realised 1-5 Likert series -- including
-     the clustered missingness mask, so the test reflects real survey gaps.
+  1. Generates sub-cohorts with KNOWN latent parameters (sigma, rho), 
+
+  2. Computes the empirical MSSD on the realised 1-5 Likert series -- 
+    -- missing EMAs 
   3. Regresses empirical MSSD against the ground-truth expected MSSD
      ( 2 * sigma^2 * (1 - rho) ). A strong positive linear relationship is the
      construct-validity defence for reviewers: MSSD tracks latent volatility
@@ -86,14 +86,14 @@ def build_validation_cohort(days=14,
         for rho in rhos:
             cell += 1
             cohort = generate_cohort(
-                users=users_per_cell,
-                days=days,
-                ema_per_day=ema_per_day,
-                seed=seed + cell,          # distinct stream per cell
-                resp_rate=resp_rate,
-                mu=mu,
-                sigma=sigma,
-                rho=rho,
+                users   = users_per_cell,
+                days    = days,
+                ema_per_day = ema_per_day,
+                seed = seed + cell,          # distinct stream per cell
+                resp_rate = resp_rate,
+                mu = mu,
+                sigma = sigma,
+                rho = rho,
             )
             for uid, g in cohort.groupby("user_id"):
                 g = g.sort_values("prompt_idx")

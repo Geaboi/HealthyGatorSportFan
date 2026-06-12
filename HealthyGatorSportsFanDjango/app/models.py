@@ -98,31 +98,10 @@ class HeartRateSample(models.Model):
     device = models.ForeignKey(WearableDevice, on_delete=models.CASCADE)
     timestamp = models.DateTimeField()
     bpm = models.PositiveSmallIntegerField()
-    zone = models.CharField(max_length=20, choices=ZONE_CHOICES, blank=True)
-    # Garmin field extension: which device produced the sample, plus the
-    # heart-rate variability (RMSSD, ms) computed from inter-beat intervals.
-    source = models.CharField(max_length=64, blank=True, default="")
-    hrv_rmssd = models.DecimalField(max_digits=6, decimal_places=2, blank=True, null=True)
+    zone = models.CharField(max_length=20, choices=ZONE_CHOICES)
 
     def __str__(self):
         return f"{self.bpm} bpm at {self.timestamp}"
-
-
-class StressSample(models.Model):
-    """
-    Garmin-style stress score (0-100) derived from continuous HRV. Stored as a
-    minute-level series alongside HeartRateSample.
-    """
-    sample_id = models.AutoField(primary_key=True)
-    device = models.ForeignKey(WearableDevice, on_delete=models.CASCADE)
-    timestamp = models.DateTimeField()
-    stress_score = models.PositiveSmallIntegerField(
-        validators=[MinValueValidator(0), MaxValueValidator(100)],
-    )
-    source = models.CharField(max_length=64, blank=True, default="")
-
-    def __str__(self):
-        return f"stress {self.stress_score} at {self.timestamp}"
 
 
 class ActivitySummary(models.Model):
@@ -149,16 +128,9 @@ class EMA(models.Model):
         ('vigorous', 'Vigorous'),
     ]
 
-    STATUS_CHOICES = [
-        ('answered', 'Answered'),
-        ('missed', 'Missed'),
-    ]
-
     ema_id = models.AutoField(primary_key=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     timestamp = models.DateTimeField(auto_now_add=True)
-    # Prompt outcome: a missed prompt is recorded explicitly with null responses.
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='answered')
     mood = models.PositiveSmallIntegerField(
         blank=True, null=True,
         validators=[MinValueValidator(1), MaxValueValidator(10)],
