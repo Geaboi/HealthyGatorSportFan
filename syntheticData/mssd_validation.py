@@ -49,6 +49,7 @@ def empirical_mssd(series):
     z = np.asarray(series, dtype=float)
     diffs = np.diff(z)
     diffs = diffs[~np.isnan(diffs)]
+    
     if diffs.size == 0:
         return np.nan
     return float(np.mean(diffs ** 2))
@@ -57,6 +58,7 @@ def empirical_mssd(series):
 def _label_for(sigma, rho):
     """Coarse Stable/Volatile tag for the strip comparison."""
     expected = 2.0 * sigma ** 2 * (1 - rho)
+
     if expected <= 0.4:
         return "Stable"
     if expected >= 1.6:
@@ -64,14 +66,14 @@ def _label_for(sigma, rho):
     return "Mid"
 
 
-def build_validation_cohort(days=14,
-                            ema_per_day=5,
-                            users_per_cell=12,
-                            resp_rate=0.80,
-                            sigmas=(0.3, 0.6, 0.9, 1.2, 1.5),
-                            rhos=(0.2, 0.5, 0.8),
-                            mu=3.0,
-                            seed=7):
+def build_validation_cohort(days    = 14,
+                            ema_per_day = 5,
+                            users_per_cell = 12,
+                            resp_rate = 0.80,
+                            sigmas = (0.3, 0.6, 0.9, 1.2, 1.5),
+                            rhos = (0.2, 0.5, 0.8),
+                            mu   = 3.0,
+                            seed = 7):
     """
     Generate one DataFrame of per-user MSSD records across a (sigma, rho) grid.
 

@@ -4,7 +4,7 @@
 
 *Date: 06/02/2026*
 
-[GITHUB](<https://github.com/tylerrleee/HealthyGatorSportFan/tree/mssd-tyler>)
+[GITHUB](<https://github.com/Geaboi/HealthyGatorSportFan/tree/synthetic-data>)
 
 Synthetic data generation for EMA (Ecological Momentary Assessment) and heart rate (HR) signals, used to validate MSSD (Mean of Squared Successive Differences) as a measure of temporal instability.
 
@@ -38,22 +38,40 @@ Out of scope: DF does not save.
 
 Core data generation module. Contains two generators:
 
-- **EMA Generator** — Produces per-user EMA time series with known latent volatility using an AR(1) process (see below about why AR(1)). 
+- **EMA Generator** : Produces per-user EMA time series with known latent volatility using an AR(1) process (see below about why AR(1)). 
     - Each user gets randomly drawn parameters (`mu`, `sigma`, `rho`) that serve as ground truth for validating MSSD. EMA values are mapped to a 1-5 Likert scale (for now). Missingness or no response is injected via randomness (`_clustered_missing_mask`) that produces realistic clustered gaps rather than random dropout.
     - No response are clustered, instead of purely random. Although this missingness can be controlled, it helps simualate the prolonged responsiveness of certain individuals
         - e.g. phone is on DND, has an exam, watching the Knicks winning NBA Finals, etc,..
     
-  - `generate_user_ids()` - Creates unique UUIDs for each user.
-  - `generate_user()` - Generates one user's EMA series with known latent parameters.
-  - `generate_cohort()` - Generates the full cohort DataFrame.
+  - `generate_user_ids()` : Creates unique UUIDs for each user.
+  - `generate_user()` : Generates one user's EMA series with known latent parameters.
+  - `generate_cohort()` : Generates the full cohort DataFrame.
 
   - `generate_user()` now accepts optional `mu` / `sigma` / `rho` so a caller can pin the latent volatility to a *known* value. This is how `mssd_validation.py` builds Stable vs. Volatile sub-cohorts.
 
-- **Heart Rate / HRV / Stress Generator** — Produces minute-level HR data per user (random Gaussian noise + activity bouts), then derives HRV and stress. Resting HR is estimated from [60,100] for young adults.
-  - `_generate_heart_rate()` — Generates one user's minute-level HR series, plus `hrv_rmssd`, `stress`, and a Garmin `source` column.
-  - `_generate_hrv_and_stress()` — Ties HRV (RMSSD) inversely to HR — `RMSSD_t = α·(100 / HR_t) + ε_t` — so a high HR compresses the inter-beat interval (low HRV) and a resting HR elevates it. Garmin then maps continuous HRV onto a 0–100 stress score (low HRV → high stress), which makes exercise-bout HR spikes raise stress.
-  - `generate_HR()` — Generates HR/HRV/stress for the full cohort, assigning each user a Garmin device model (`GARMIN_DEVICES`).
+- **Heart Rate + Stress Generator** : Produces minute-level HR data per user (random Gaussian noise + activity bouts), plus a continuous all-day stress score. Resting HR is estimated from [60,100] for young adults.
+  - `_generate_heart_rate()` : Generates one user's minute-level HR series, plus a `stress` and a Garmin `source` column.
+  - `_generate_stress()` : Garmin's all-day **stress** (0–100) is genuinely continuous, so it's derived directly from HR: HR is normalised over a resting→exertion band and mapped to 0–100 (higher HR → higher stress). Activity bouts already in the HR trace therefore produce stress spikes.
+  - `generate_HR()` : Generates HR + stress for the full cohort, assigning each user a Garmin device model (`GARMIN_DEVICES`).
+
+- **HRV Status Generator (overnight)** : Garmin's **HRV Status is measured during sleep**, one value per night, *not* continuously coupled to HR. Each night gets an overnight average RMSSD, a trailing **7-day baseline**, and a status label (`Balanced` / `Unbalanced` / `Low`, or `No Status` during the warm-up window).
+  - `_generate_overnight_hrv()` : per-user baseline RMSSD (young-adult range) with night-to-night AR(1) drift, nudged lower after high-load days.
+  - `daily_load_from_hr()` : per-user/day load proxy (that day's mean stress, z-scored) used to couple a hard day --> lower overnight HRV.
+  - `generate_HRV()` : nightly cohort DataFrame: `user_id, night, overnight_avg_rmssd, baseline_7d, hrv_status, source`.
+  - Note: HRV and stress are **analysis-only** -- they are generated for figures/inspection but **not** persisted (the live Django schema has no columns for them; see `db_seed.py`).
     - Parameters are tweakable in `synthetic_generator.py`
+
+  $$RMSSD = \sqrt{\frac{1}{N-1}\sum_{i=1}^{N-1}(RR_{i+1} - RR_i)^2}$$
+
+  $$ BPM = \frac{60,000}{RR interval (ms)}$$
+
+  Constraint: RR measures the exact time (in milliseconds) between individual heartbeats, in which requires beat-to-beat HR recording assumption. 
+
+  Hence, given that HR is measured in minute0level, we guess a baseline HR , where $baseline ~ Uniform(35,75)$ with:
+
+  $$ z_d = \phi * z_{d-1} + e_d$$
+
+  where coefficient $\phi$ is how we want to scale different demographics. 
 
 ### `mssd_validation.py`
 
@@ -141,9 +159,13 @@ Output directory for saved plots:
 
 ![4](./figures/response_raster.png)
 
-- `hrv_stress_analysis.png` - Inverse HR/HRV coupling + derived Garmin stress for one user.
+- `stress_analysis.png` - Continuous all-day Garmin stress (from HR) for one user.
 
-![5](./figures/hrv_stress_analysis.png)
+![5](./figures/stress_analysis.png)
+
+- `hrv_status_analysis.png` - Overnight HRV Status for one user: nightly RMSSD, 7-day baseline band, and status-coloured points.
+
+![5b](./figures/hrv_status_analysis.png)
 
 ### `figures/validation/`
 

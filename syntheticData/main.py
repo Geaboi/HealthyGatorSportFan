@@ -1,18 +1,25 @@
-from synthetic_generator import generate_user_ids, generate_cohort, generate_HR
+from synthetic_generator import (
+    generate_user_ids,
+    generate_cohort,
+    generate_HR,
+    generate_HRV,
+    daily_load_from_hr,
+)
 import pandas as pd
 from plotting import (
     plot_gap_histogram,
     plot_missing_rate_histogram,
     plot_response_raster,
     plot_heart_rate,
-    plot_hrv_stress,
+    plot_stress,
+    plot_hrv_status,
 )
 
 if __name__ == "__main__":
 
     # TWEAK PARAMETERS HERE
     USERS = 100
-    DAYS = 7
+    DAYS = 21
     EMA_PER_DAY = 5
     RESP_RATE = 0.80
     SEED = 42
@@ -30,12 +37,22 @@ if __name__ == "__main__":
         user_ids=user_ids,
     )
 
-    # Generate HR data
+    # Generate HR (+ continuous all-day stress) data
     hr_df = generate_HR(
         users=USERS,
         days=DAYS,
         seed=SEED,
         user_ids=user_ids,
+    )
+
+    # Generate nightly HRV Status, coupled to each day's load from the HR trace
+    load_df = daily_load_from_hr(hr_df)
+    hrv_df = generate_HRV(
+        users=USERS,
+        days=DAYS,
+        seed=SEED,
+        user_ids=user_ids,
+        daily_load_df=load_df,
     )
 
     # Plot diagnostics (all save to ./syntheticData/figures/)
@@ -45,10 +62,13 @@ if __name__ == "__main__":
 
     target_date = pd.to_datetime('2026-06-02').date()
     sample_hr = hr_df[
-        (hr_df["user_id"] == user_ids[0]) & 
+        (hr_df["user_id"] == user_ids[0]) &
         (hr_df['timestamp'].dt.date == target_date)
     ]
     plot_heart_rate(sample_hr)  # single user for readability | add more if needed
-    plot_hrv_stress(sample_hr)  # Garmin HRV + stress diagnostics
+    plot_stress(sample_hr)      # continuous all-day stress (from HR)
+
+    sample_hrv = hrv_df[hrv_df["user_id"] == user_ids[0]]
+    plot_hrv_status(sample_hrv)  # overnight HRV Status across all nights
 
     print('DONE RUNNING')

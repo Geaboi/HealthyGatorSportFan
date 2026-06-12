@@ -171,62 +171,99 @@ def generate_cohort(users = 100,
 
 ### WEARABLE PROFILE
 # We simulate the Garmin hardware line (Venu 3 / Vivoactive 5/6) rather than
-# Fitbit. Garmin derives stress from continuous HRV (RMSSD on inter-beat
-# intervals) mapped to a 0-100 score, so each sample is flagged with its
-# source device and carries an HRV value alongside heart rate.
+# Fitbit. Garmin reports two distinct HRV-based products:
+#   - all-day STRESS (0-100): continuous, reported minute-by-minute. Modelled
+#     here directly from heart rate (see `_generate_stress`).
+#   - HRV STATUS: OVERNIGHT only -- RMSSD is measured during sleep, one value
+#     per night, compared against a rolling 7-day baseline to label a status
+#     (Balanced / Unbalanced / Low). Modelled nightly (see `generate_HRV`),
+#     NOT continuously coupled to heart rate.
 GARMIN_DEVICES = ("Garmin Venu 3", "Garmin Vivoactive 5", "Garmin Vivoactive 6")
 
 
-def _generate_hrv_and_stress(hr,
-                             rng,
-                             alpha = 55.0,
-                             hrv_noise_std = 4.0,
-                             rmssd_clip = (12.0, 120.0),
-                             stress_window = (15.0, 90.0),
-                             stress_noise_std = 4.0):
+def _generate_stress(hr,
+                     rng,
+                     stress_window = (55.0, 130.0),
+                     stress_noise_std = 4.0):
     """
-    Derive minute-level HRV (RMSSD) and a Garmin-style stress score (0-100)
-    from an existing heart-rate array.
+    Continuous minute-level Garmin-style stress score (0-100) derived directly
+    from heart rate: higher HR (arousal / exertion) reads as higher stress.
 
-    Physiology: a high heart rate compresses the inter-beat interval, leaving
-    less room to vary, so HRV falls; resting states elevate HRV. We tie RMSSD
-    inversely to HR:
-
-        RMSSD_t = alpha * (100 / HR_t) + eps_t
-
-    where `alpha` scales into a young-adult Garmin RMSSD range and `eps_t`
-    is somatic noise. Garmin then maps continuous HRV to a 0-100 stress score:
-    low HRV -> high stress. Because exercise bouts spike HR, they depress HRV
-    and therefore raise stress, giving the algorithmic HR-spike -> stress
-    correlation the spec calls for.
+    HR is normalised over a resting->exertion band and mapped onto 0-100. Because
+    the activity bouts already live in the HR trace, exercise spikes naturally
+    produce stress spikes -- without routing through HRV (which is overnight-only
+    on Garmin and modelled separately).
 
     Args:
-        hr             : 1D array of minute-level heart rate (bpm).
-        rng            : np.random.Generator.
-        alpha          : RMSSD scaling factor (young-adult Garmin range).
-        hrv_noise_std  : std of additive RMSSD noise (ms).
-        rmssd_clip     : (lo, hi) physiological clamp for RMSSD (ms).
-        stress_window  : (lo, hi) RMSSD band normalised onto the 0-100 score.
+        hr               : 1D array of minute-level heart rate (bpm).
+        rng              : np.random.Generator.
+        stress_window    : (lo, hi) HR band normalised onto the 0-100 score.
         stress_noise_std : std of additive stress noise (points).
 
     Returns:
-        (rmssd, stress) float arrays, same length as `hr`.
+        stress float array, same length as `hr`.
     """
     hr = np.asarray(hr, dtype=float)
-    n = hr.shape[0]
-
-    # inverse HR -> HRV coupling
-    rmssd = alpha * (100.0 / hr) + rng.normal(0, hrv_noise_std, n)
-    rmssd = np.clip(rmssd, *rmssd_clip)
-
-    # Garmin stress: normalise RMSSD over a fixed band, then invert so that
-    # low HRV reads as high stress.
     lo, hi = stress_window
-    norm = np.clip((rmssd - lo) / (hi - lo), 0.0, 1.0)
-    stress = 100.0 * (1.0 - norm) + rng.normal(0, stress_noise_std, n)
-    stress = np.clip(stress, 0.0, 100.0)
+    norm = np.clip((hr - lo) / (hi - lo), 0.0, 1.0)
+    stress = 100.0 * norm + rng.normal(0, stress_noise_std, hr.shape[0])
+    return np.clip(stress, 0.0, 100.0)
 
-    return rmssd, stress
+
+### HRV STATUS (overnight)
+HRV_STATUS_NO_DATA = "No Status"
+
+
+def _hrv_status(rmssd, baseline_7d, band):
+    """
+    Garmin-style HRV Status label for one night.
+
+    `baseline_7d` / `band` are NaN until enough history has accrued, in which
+    case the status is "No Status" (Garmin needs a warm-up window). Otherwise
+    last night is compared against the personalised baseline band:
+        within band -> Balanced;  below -> Low;  above -> Unbalanced.
+    """
+    if np.isnan(baseline_7d) or np.isnan(band):
+        return HRV_STATUS_NO_DATA
+    if rmssd < baseline_7d - band:
+        return "Low"
+    if rmssd > baseline_7d + band:
+        return "Unbalanced"
+    return "Balanced"
+
+
+def _generate_overnight_hrv(days,
+                            rng,
+                            baseline,
+                            daily_load = None,
+                            phi = 0.5,
+                            night_sd = 6.0,
+                            load_coef = 5.0,
+                            extra_noise_std = 2.0,
+                            rmssd_clip = (15.0, 120.0)):
+    """
+    One user's overnight average RMSSD (ms) for each of `days` nights.
+
+    Model (NOT tied minute-to-minute to HR):
+      - per-user `baseline` overnight RMSSD.
+      - night-to-night AR(1) drift: z[d] = phi*z[d-1] + N(0, night_sd*sqrt(1-phi^2)).
+      - daily-load coupling: if `daily_load` (per-night z-scored load) is given,
+        subtract load_coef * load_z[d] so a hard/stressful day lowers that
+        night's recovery.
+
+    Returns a length-`days` float array, clipped to a physiological range.
+    """
+    z = np.zeros(days)
+    z[0] = rng.normal(0, night_sd)
+    innov = night_sd * np.sqrt(1.0 - phi ** 2)
+    for d in range(1, days):
+        z[d] = phi * z[d - 1] + rng.normal(0, innov)
+
+    rmssd = baseline + z + rng.normal(0, extra_noise_std, days)
+    if daily_load is not None:
+        rmssd = rmssd - load_coef * np.asarray(daily_load, dtype=float)
+
+    return np.clip(rmssd, *rmssd_clip)
 
 
 ### HEART RATE GENERATOR
@@ -278,8 +315,9 @@ def _generate_heart_rate(user_id,
 
     hr = np.clip(resting_hr + circadian + noise + activity, 40, 200)
 
-    # Garmin HRV + stress derived from the heart-rate trace
-    rmssd, stress = _generate_hrv_and_stress(hr, rng)
+    # Continuous all-day Garmin stress, derived directly from the HR trace.
+    # (HRV Status is overnight-only and generated separately -- see generate_HRV.)
+    stress = _generate_stress(hr, rng)
 
     timestamps = pd.date_range(start="2026-06-01", periods=n, freq="min")
     return pd.DataFrame({
@@ -288,7 +326,6 @@ def _generate_heart_rate(user_id,
             "minute":    t,
             "day":       t // min_per_day,
             "hr":        hr,
-            "hrv_rmssd": rmssd,
             "stress":    stress,
             "source":    source,
         })
@@ -318,4 +355,90 @@ def generate_HR(users = 100,
         all_data.append(df_user)
 
     return pd.concat(all_data, ignore_index = True)
+
+
+def daily_load_from_hr(hr_df):
+    """
+    Per-user, per-day load proxy for HRV coupling: the day's mean continuous
+    stress, z-scored within each user. A high-load day -> positive load_z ->
+    lower overnight RMSSD that night (see `_generate_overnight_hrv`).
+
+    Returns a tidy DataFrame: user_id, day, load_z.
+    """
+    g = (hr_df.groupby(["user_id", "day"])["stress"]
+              .mean().reset_index(name="load"))
+
+    def _z(s):
+        sd = s.std()
+        return (s - s.mean()) / (sd if sd and sd > 0 else 1.0)
+
+    g["load_z"] = g.groupby("user_id")["load"].transform(_z)
+    return g[["user_id", "day", "load_z"]]
+
+
+def generate_HRV(users = 100,
+                 days  = 14,
+                 seed = 0,
+                 user_ids = None,
+                 daily_load_df = None,
+                 baseline_range = (35.0, 75.0)):
+    """
+    Nightly Garmin HRV Status for a cohort: one overnight RMSSD per user per
+    night, a trailing 7-night baseline, and a status label.
+
+    `daily_load_df` (from `daily_load_from_hr`) optionally couples each night's
+    recovery to that day's load. Returns a tidy DataFrame:
+        user_id, night, overnight_avg_rmssd, baseline_7d, hrv_status, source.
+    """
+    if users < 1:
+        raise ValueError(f"Need more than one user to generate... got {users}")
+    if days < 1:
+        raise ValueError(f"Need more than one day to generate... got {days}")
+
+    if user_ids is None:
+        user_ids = generate_user_ids(users)
+    rng = np.random.default_rng(seed)
+
+    # per-user ordered load array, aligned to day index
+    load_lookup = {}
+    if daily_load_df is not None:
+        for uid, g in daily_load_df.groupby("user_id"):
+            load_lookup[uid] = g.sort_values("day")["load_z"].to_numpy()
+
+    start = pd.to_datetime("2026-06-01")
+    nights = [start + pd.Timedelta(days=d) for d in range(days)]
+
+    all_rows = []
+    for uid in user_ids:
+        source = GARMIN_DEVICES[rng.integers(0, len(GARMIN_DEVICES))]
+        baseline = rng.uniform(*baseline_range)
+
+        load = load_lookup.get(uid)
+        if load is not None and len(load) >= days:
+            load = load[:days]
+        elif load is not None:                       # pad short series with 0
+            load = np.concatenate([load, np.zeros(days - len(load))])
+
+        rmssd = _generate_overnight_hrv(days, rng, baseline, daily_load=load)
+
+        # trailing 7-night baseline + band (excludes the current night so a
+        # night is never compared against itself)
+        s = pd.Series(rmssd)
+        base = s.rolling(window=7, min_periods=3).mean().shift(1)
+        std  = s.rolling(window=7, min_periods=3).std().shift(1)
+        band = np.maximum(0.5 * std, 5.0)
+
+        status = [_hrv_status(rmssd[d], base.iloc[d], band.iloc[d])
+                  for d in range(days)]
+
+        all_rows.append(pd.DataFrame({
+            "user_id": uid,
+            "night": nights,
+            "overnight_avg_rmssd": np.round(rmssd, 1),
+            "baseline_7d": np.round(base.to_numpy(), 1),
+            "hrv_status": status,
+            "source": source,
+        }))
+
+    return pd.concat(all_rows, ignore_index=True)
 

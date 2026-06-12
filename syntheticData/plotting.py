@@ -145,39 +145,82 @@ def plot_heart_rate(df, figsize=(15, 6)):
     fig.savefig(os.path.join(FIGURE_DIR, "heart_rate_analysis.png"), bbox_inches="tight")
 
 
-def plot_hrv_stress(df, figsize=(15, 8)):
+def plot_stress(df, figsize=(15, 6)):
     """
-    Garmin diagnostics for a single user: HR vs HRV (RMSSD) sharing a time axis
-    to show the inverse coupling, and the derived 0-100 stress score. Expects
-    the extended HR DataFrame (columns: timestamp, hr, hrv_rmssd, stress).
+    Continuous all-day Garmin stress (0-100) for a single user, with HR overlaid
+    on a second axis to show that stress tracks heart rate. Expects the HR
+    DataFrame (columns: timestamp, hr, stress).
     """
-    fig, (ax_hr, ax_stress) = plt.subplots(2, 1, figsize=figsize, sharex=True)
+    fig, ax_stress = plt.subplots(figsize=figsize)
 
-    # HR (left axis) vs HRV (right axis): they move opposite each other
-    ax_hr.plot(df['timestamp'], df['hr'], color='tab:red', alpha=0.6,
+    ax_stress.plot(df['timestamp'], df['stress'], color='tab:purple',
+                   alpha=0.7, linewidth=1, label='Stress (0-100)')
+    ax_stress.set_ylim(0, 100)
+    ax_stress.set_ylabel("Stress score", color='tab:purple')
+    ax_stress.tick_params(axis='y', labelcolor='tab:purple')
+    ax_stress.set_xlabel("Time")
+
+    ax_hr = ax_stress.twinx()
+    ax_hr.plot(df['timestamp'], df['hr'], color='tab:red', alpha=0.4,
                linewidth=1, label='Heart Rate (bpm)')
     ax_hr.set_ylabel("BPM", color='tab:red')
     ax_hr.tick_params(axis='y', labelcolor='tab:red')
 
-    ax_hrv = ax_hr.twinx()
-    ax_hrv.plot(df['timestamp'], df['hrv_rmssd'], color='tab:blue', alpha=0.6,
-                linewidth=1, label='HRV (RMSSD, ms)')
-    ax_hrv.set_ylabel("RMSSD (ms)", color='tab:blue')
-    ax_hrv.tick_params(axis='y', labelcolor='tab:blue')
     src = df['source'].iloc[0] if 'source' in df.columns and len(df) else 'Garmin'
-    ax_hr.set_title(f"Inverse HR / HRV coupling ({src})")
-    ax_hr.grid(True, linestyle='--', alpha=0.5)
-
-    # Stress score 0-100
-    ax_stress.plot(df['timestamp'], df['stress'], color='tab:purple',
-                   alpha=0.7, linewidth=1, label='Stress (0-100)')
-    ax_stress.set_ylim(0, 100)
-    ax_stress.set_ylabel("Stress score")
-    ax_stress.set_xlabel("Time")
-    ax_stress.set_title("Garmin stress (low HRV -> high stress)")
+    ax_stress.set_title(f"Continuous all-day stress, from HR ({src})")
     ax_stress.grid(True, linestyle='--', alpha=0.5)
-
     ax_stress.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
     fig.autofmt_xdate()
     fig.tight_layout()
-    fig.savefig(os.path.join(FIGURE_DIR, "hrv_stress_analysis.png"), bbox_inches="tight")
+    fig.savefig(os.path.join(FIGURE_DIR, "stress_analysis.png"), bbox_inches="tight")
+
+
+def plot_hrv_status(df, figsize=(13, 6)):
+    """
+    Nightly Garmin HRV Status for a single user: overnight RMSSD per night, the
+    trailing 7-day baseline line + shaded balanced band, and status-coloured
+    markers. Expects the nightly DataFrame from `generate_HRV` (columns:
+    night, overnight_avg_rmssd, baseline_7d, hrv_status, source).
+    """
+    df = df.sort_values("night")
+    nights = df["night"]
+    rmssd = df["overnight_avg_rmssd"].to_numpy(dtype=float)
+    base = df["baseline_7d"].to_numpy(dtype=float)
+    band = np.maximum(0.5 * np.nanstd(rmssd), 5.0)  # display band ~ matches model
+
+    status_color = {
+        "Balanced": "tab:green",
+        "Low": "tab:red",
+        "Unbalanced": "tab:orange",
+        "No Status": "tab:gray",
+    }
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    # overnight RMSSD trace
+    ax.plot(nights, rmssd, color="tab:blue", alpha=0.5, linewidth=1.2,
+            zorder=1, label="overnight RMSSD")
+
+    # 7-day baseline + balanced band
+    ax.plot(nights, base, color="black", linewidth=1.5, linestyle="--",
+            zorder=2, label="7-day baseline")
+    ax.fill_between(nights, base - band, base + band, color="tab:green",
+                    alpha=0.12, zorder=0, label="balanced band")
+
+    # status-coloured points
+    for status, color in status_color.items():
+        m = df["hrv_status"] == status
+        if m.any():
+            ax.scatter(nights[m], rmssd[m], color=color, s=55, zorder=3,
+                       edgecolor="white", label=status)
+
+    src = df["source"].iloc[0] if "source" in df.columns and len(df) else "Garmin"
+    ax.set_title(f"Overnight HRV Status ({src})")
+    ax.set_xlabel("Night")
+    ax.set_ylabel("RMSSD (ms)")
+    ax.grid(True, linestyle="--", alpha=0.4)
+    ax.legend(loc="best", fontsize=8, ncol=2)
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%m-%d"))
+    fig.autofmt_xdate()
+    fig.tight_layout()
+    fig.savefig(os.path.join(FIGURE_DIR, "hrv_status_analysis.png"), bbox_inches="tight")
