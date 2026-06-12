@@ -65,13 +65,14 @@ python mssd_validation.py
 
 ### `db_seed.py`
 
-ETL / seed script (Phase 3). Uses **SQLAlchemy reflection** to bulk-insert a synthetic cohort into the **Django database** (the app owns the schema; run its migrations first). Inserts respect foreign-key order:
+ETL / seed script (Phase 3). Uses **SQLAlchemy reflection** to bulk-insert a synthetic cohort into the **Django database** (the app owns the schema; run its migrations first), targeting the **original** Django schema — no schema changes are required. Inserts respect foreign-key order:
 
 ```
-app_user → app_wearabledevice → app_heartratesample
-                              → app_stresssample
-app_user → app_ema   (missed prompts written explicitly as status='missed')
+app_user → app_wearabledevice → app_heartratesample   (bpm + HR zone)
+app_user → app_ema                                    (mood = 1–5 Likert)
 ```
+
+HRV/stress are generated for analysis (see the generator + figures) but are **not** pushed, since the live schema has no columns for them. Missed EMA prompts are simply **omitted** (there's no `status` column). Each row also lands in `csv_export/<table>.csv` for inspection (`--no-csv` to skip).
 
 Synthetic users are tagged with an `@synthetic.gatorfan` email so `--reset` wipes a previous seed without touching real accounts. Target DB comes from `DATABASE_URL` (e.g. Heroku Postgres) or defaults to the local sqlite DB the Django migrations create.
 
@@ -83,8 +84,6 @@ Synthetic users are tagged with an `@synthetic.gatorfan` email so `--reset` wipe
 python db_seed.py --users 100 --days 7 --reset
 DATABASE_URL=postgres://... python db_seed.py --users 100 --reset   # any Django DB
 ```
-
-> Schema note: this added `source` + `hrv_rmssd` to `HeartRateSample`, a `status` field to `EMA`, and a new `StressSample` model on the Django side (migration `app/0025_…`).
 
 #### First-Order Autoregressive Model
 
