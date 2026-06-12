@@ -90,9 +90,21 @@ def reset_synthetic(conn, t):
     conn.execute(sa.delete(users).where(users.c.email.like(f"%@{SYNTHETIC_DOMAIN}")))
 
 
+def _normalize_url(url):
+    """
+    Heroku exports DATABASE_URL as 'postgres://...', but SQLAlchemy's
+    create_engine only accepts the 'postgresql://' scheme (the 'postgres'
+    alias was removed in SQLAlchemy 1.4+). Rewrite it so a Heroku URL can be
+    pasted as-is.
+    """
+    if url.startswith("postgres://"):
+        return "postgresql://" + url[len("postgres://"):]
+    return url
+
+
 def seed(database_url, users, days, ema_per_day, resp_rate, hr_every, seed_val,
          do_reset):
-    engine = sa.create_engine(database_url)
+    engine = sa.create_engine(_normalize_url(database_url))
     t = _reflect(engine)
     rng = np.random.default_rng(seed_val)
 
