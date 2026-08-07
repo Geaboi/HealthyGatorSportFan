@@ -36,3 +36,8 @@ HealthyGatorSportsFanRN\constants\AppUrls.ts
 
 # Ignore FCM file
 HealthyGatorSportsFanRN\google-services.json
+
+
+.gitignore
+CLAUDE.md
+.venv-seed/
